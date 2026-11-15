@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ImageForge</title>
+<style>
+:root{--bg:#0d0e11;--panel:#16181d;--line:#272a32;--ink:#ece8df;--dim:#8d8f98;--amber:#ff9d3c;--red:#ff6b5e;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 "Segoe UI",system-ui,sans-serif}
+h1{font:600 22px/1 Georgia,"Times New Roman",serif;margin:0;letter-spacing:.2px}
+header{padding:18px 20px;border-bottom:1px solid var(--line);display:flex;align-items:baseline;gap:14px}
+header span{color:var(--dim);font-size:13px}
+main{display:grid;grid-template-columns:340px 1fr;min-height:calc(100vh - 62px)}
+@media(max-width:820px){main{grid-template-columns:1fr}}
+aside{padding:18px 20px;border-right:1px solid var(--line);display:flex;flex-direction:column;gap:14px}
+label{font-size:13px;color:var(--dim);display:block;margin-bottom:5px}
+textarea,input,select{width:100%;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:9px 10px;font:inherit}
+textarea{resize:vertical;min-height:92px}
+:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+.row{display:flex;gap:10px}.row>*{flex:1}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:5px 10px;border-radius:99px;font-size:13px;cursor:pointer}
+.chip[aria-pressed=true]{background:var(--amber);color:#1a1206;border-color:var(--amber)}
+button{font:inherit;cursor:pointer}
+.go{background:var(--amber);color:#1a1206;border:0;border-radius:6px;padding:12px;font-weight:600}
+.go:disabled{opacity:.5;cursor:wait}
+.ghost{background:none;border:1px solid var(--line);color:var(--ink);border-radius:6px;padding:6px 10px;font-size:13px}
+.ghost:hover{border-color:var(--amber)}
+section{padding:18px 20px}
+.bar{display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap}
+.bar input{max-width:240px}.bar .sp{flex:1}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;overflow:hidden;cursor:pointer;position:relative}
+.card img{display:block;width:100%;height:auto}
+.card .meta{padding:8px 10px;font-size:12px;color:var(--dim);display:flex;justify-content:space-between;gap:8px}
+.card .meta b{color:var(--ink);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pend{aspect-ratio:1;display:grid;place-items:center;text-align:center;padding:14px;color:var(--dim);font-size:13px;cursor:default}
+.pend.err{color:var(--red)}
+.pend .bar2{width:70%;height:3px;background:var(--line);margin:10px auto 0;overflow:hidden;border-radius:2px}
+.pend .bar2 i{display:block;height:100%;width:40%;background:var(--amber);animation:s 1.2s ease-in-out infinite}
+@keyframes s{0%{margin-left:-40%}100%{margin-left:100%}}
+@media(prefers-reduced-motion:reduce){.pend .bar2 i{animation:none;width:100%}}
+.empty{color:var(--dim);padding:40px 0;max-width:420px}
+#lb{position:fixed;inset:0;background:rgba(5,5,7,.94);display:none;flex-direction:column;z-index:9}
+#lb.on{display:flex}
+#lb .stage{flex:1;display:grid;place-items:center;padding:16px;min-height:0}
+#lb img{max-width:100%;max-height:100%;object-fit:contain}
+#lb .info{padding:12px 20px 18px;border-top:1px solid var(--line);display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+#lb .info p{margin:0;flex:1 1 320px;font-size:13px;color:var(--dim)}
+</style>
+</head>
+<body>
+<header><h1>ImageForge</h1><span>Text to image, with provider fallback on outages</span></header>
+<main>
+<aside>
+  <div><label for="p">Prompt</label><textarea id="p" placeholder="Describe the image you want"></textarea></div>
+  <div><label for="n">Avoid (optional)</label><input id="n" placeholder="blurry, extra fingers"></div>
+  <div><label>Style</label><div class="chips" id="styles"></div></div>
+  <div class="row">
+    <div><label for="a">Shape</label><select id="a"></select></div>
+    <div><label for="m">Model</label><select id="m"><option value="flux">Flux</option><option value="turbo">Turbo</option><option value="flux-realism">Flux realism</option></select></div>
+  </div>
+  <div class="row">
+    <div><label for="c">Images</label><select id="c"><option>1</option><option>2</option><option>4</option></select></div>
+    <div><label for="s">Seed (blank = random)</label><input id="s" inputmode="numeric" placeholder="random"></div>
+  </div>
+  <div><label for="ch">Provider</label><select id="ch"><option value="auto">Auto: Airforce, then Pollinations</option><option value="airforce">Airforce only</option><option value="pollinations">Pollinations only</option></select></div>
+  <button class="go" id="go">Generate</button>
+  <small style="color:var(--dim)">If a provider declines a prompt, that decision is shown as is. Fallback only happens when a provider is down or times out.</small>
+</aside>
+<section>
+  <div class="bar"><input id="q" placeholder="Search saved prompts" aria-label="Search saved prompts"><span class="sp"></span><span id="count" style="color:var(--dim);font-size:13px"></span><button class="ghost" id="clear">Clear all</button></div>
+  <div class="grid" id="grid"></div>
+</section>
+</main>
+<div id="lb" role="dialog" aria-modal="true" aria-label="Image viewer">
+  <div class="stage"><img id="lbi" alt=""></div>
+  <div class="info"><p id="lbt"></p>
+    <button class="ghost" id="prev">Previous</button><button class="ghost" id="next">Next</button>
+    <button class="ghost" id="reuse">Reuse prompt</button><button class="ghost" id="up">Upscale 2×</button>
+    <button class="ghost" id="dl">Download</button><button class="ghost" id="del">Delete</button><button class="ghost" id="x">Close</button></div>
+</div>
+<script>
+const STYLES={Cinematic:", cinematic lighting, shallow depth of field, film grain, 35mm",Anime:", anime key visual, clean lineart, vibrant colors",Cyberpunk:", cyberpunk, neon reflections, rain-slick streets",Oil:", oil on canvas, thick impasto brushstrokes, museum lighting","3D":", octane render, volumetric light, 8k",Studio:", studio product photography, softbox lighting, crisp detail",Watercolor:", loose watercolor wash, cold press paper texture",Editorial:", documentary editorial photography, natural window light"};
+const ASPECTS={"1:1 Square":[768,768],"3:4 Portrait":[576,768],"4:3 Landscape":[768,576],"9:16 Vertical":[512,896],"16:9 Wide":[896,512]};
+const KEY="imageforge_history_v1",MAX=24;
+const $=id=>document.getElementById(id);
+let history=[],pending=[],chosen=new Set(),view=[],cur=-1;
+try{history=JSON.parse(localStorage.getItem(KEY)||"[]")}catch{history=[]}
+function persist(){let h=history.slice(0,MAX);while(h.length){try{localStorage.setItem(KEY,JSON.stringify(h));history=h;return}catch{h=h.slice(0,h.length-2)}}try{localStorage.removeItem(KEY)}catch{}}
+
+// UI setup
+for(const k of Object.keys(ASPECTS)){const o=document.createElement("option");o.textContent=k;$("a").appendChild(o)}
+for(const k of Object.keys(STYLES)){const b=document.createElement("button");b.className="chip";b.textContent=k;b.setAttribute("aria-pressed","false");
+  b.onclick=()=>{chosen.has(k)?chosen.delete(k):chosen.add(k);b.setAttribute("aria-pressed",chosen.has(k))};$("styles").appendChild(b)}
+
+// Providers
+class Declined extends Error{}
+function toDataUrl(blob){return new Promise((res,rej)=>{const r=new FileReader();r.onloadend=()=>res(r.result);r.onerror=()=>rej(new Error("Could not read image"));r.readAsDataURL(blob)})}
+function timeout(ms,msg){return new Promise((_,rej)=>setTimeout(()=>rej(new Error(msg)),ms))}
+function get(url,ms){return Promise.race([fetch(url),timeout(ms,"request timed out")])}
+function imgLoad(url,ms){return Promise.race([new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(url);i.onerror=()=>rej(new Error("image failed to load"));i.src=url}),timeout(ms,"image load timed out")])}
+async function fromResponse(res,name){
+  if([400,402,403,451].includes(res.status)){let m="";try{m=(await res.text()).slice(0,160)}catch{}throw new Declined(`${name} declined this request (HTTP ${res.status}). ${m}`.trim())}
+  if(!res.ok)throw new Error(`${name} HTTP ${res.status}`);
+  const ct=res.headers.get("content-type")||"";
+  if(ct.startsWith("image/")){const b=await res.blob();if(b.size<256)throw new Error(`${name} returned an empty image`);return toDataUrl(b)}
+  const d=await res.json();
+  if(d&&d.b64_json)return"data:image/png;base64,"+d.b64_json;
+  if(d&&typeof d.url==="string"&&d.url.startsWith("http")){const r2=await get(d.url,30000);if(!r2.ok)throw new Error(`${name} image HTTP ${r2.status}`);return toDataUrl(await r2.blob())}
+  throw new Error(`${name} returned an unexpected payload`);
+}
+const providers={
+  airforce:{name:"Airforce",url:j=>`https://api.airforce/imagine2?prompt=${encodeURIComponent(j.full)}&model=${j.model==="turbo"?"flux":j.model}&width=${j.w}&height=${j.h}&seed=${j.seed}`,
+    run:async function(j){return fromResponse(await get(this.url(j),15000),"Airforce")}},
+  pollinations:{name:"Pollinations",url:j=>{const p=j.neg?`${j.full} | avoid: ${j.neg}`:j.full;
+    return `https://image.pollinations.ai/prompt/${encodeURIComponent(p)}?width=${j.w}&height=${j.h}&seed=${j.seed}&model=${j.model==="flux-realism"?"flux":j.model}&nologo=true`},
+    run:async function(j){return fromResponse(await get(this.url(j),15000),"Pollinations")}}
+};
+async function forge(j,mode,stage){
+  const order=mode==="auto"?["airforce","pollinations"]:[mode],errs=[];
+  for(const k of order){const pv=providers[k];stage(`Asking ${pv.name}…`);
+    try{return{url:await pv.run(j),provider:pv.name,note:errs.length?"Fallback after: "+errs[0]:""}}
+    catch(e){if(e instanceof Declined)throw e;errs.push(e.message);
+      // fetch can be blocked in sandboxed viewers; an image tag usually still loads
+      try{stage(`Loading ${pv.name} image directly…`);return{url:await imgLoad(pv.url(j),75000),provider:pv.name,note:"Loaded directly (kept as a link, not saved offline)"}}
+      catch(e2){errs.push(e2.message)}}}
+  throw new Error("No provider reachable ("+errs.join("; ")+")");
+}
+
+// Generate
+function rid(){return Math.random().toString(36).slice(2,10)}
+$("go").onclick=async()=>{
+  const prompt=$("p").value.trim();if(!prompt){$("p").focus();return}
+  const [w,h]=ASPECTS[$("a").value],n=+$("c").value,model=$("m").value,mode=$("ch").value,neg=$("n").value.trim();
+  const full=prompt+[...chosen].map(k=>STYLES[k]).join("");
+  const base=$("s").value.trim()===""?null:parseInt($("s").value,10);
+  $("go").disabled=true;
+  const jobs=Array.from({length:n},(_,i)=>({id:rid(),prompt,full,neg,w,h,model,seed:Number.isFinite(base)&&base!==null?base+i:Math.floor(Math.random()*1e9),stage:"Queued",t0:Date.now()}));
+  pending.unshift(...jobs);render();
+  await Promise.all(jobs.map(async j=>{
+    try{const r=await forge(j,mode,s=>{j.stage=s;render()});
+      pending=pending.filter(x=>x!==j);
+      history.unshift({id:j.id,url:r.url,prompt:j.prompt,full:j.full,neg:j.neg,seed:j.seed,w:j.w,h:j.h,model:j.model,provider:r.provider,note:r.note,at:Date.now()});persist()}
+    catch(e){j.error=e.message;j.link=providers.pollinations.url(j)}
+    render()}));
+  $("go").disabled=false;
+};
+
+// Gallery
+function render(){
+  const q=$("q").value.toLowerCase();
+  view=history.filter(x=>!q||x.prompt.toLowerCase().includes(q));
+  const g=$("grid");g.textContent="";
+  for(const j of pending){const d=document.createElement("div");d.className="card pend"+(j.error?" err":"");
+    const t=document.createElement("div");t.textContent=j.error||`${j.stage} (${Math.round((Date.now()-j.t0)/1000)}s)`;d.appendChild(t);
+    if(j.error){const a=document.createElement("a");a.href=j.link;a.target="_blank";a.rel="noopener";a.textContent="Test this image in your browser";a.style.cssText="display:block;margin-top:10px;color:#ff9d3c";t.appendChild(document.createElement("br"));t.appendChild(a);const b=document.createElement("button");b.className="ghost";b.textContent="Dismiss";b.style.marginTop="10px";b.onclick=()=>{pending=pending.filter(x=>x!==j);render()};t.appendChild(document.createElement("br"));t.appendChild(b)}
+    else{const bar=document.createElement("div");bar.className="bar2";bar.appendChild(document.createElement("i"));t.appendChild(bar)}
+    g.appendChild(d)}
+  view.forEach((x,i)=>{const c=document.createElement("div");c.className="card";c.tabIndex=0;
+    const im=document.createElement("img");im.src=x.url;im.alt=x.prompt;im.loading="lazy";
+    const m=document.createElement("div");m.className="meta";const b=document.createElement("b");b.textContent=x.prompt;const s=document.createElement("span");s.textContent=x.provider;m.append(b,s);
+    c.append(im,m);c.onclick=()=>open(i);c.onkeydown=e=>{if(e.key==="Enter")open(i)};g.appendChild(c)});
+  if(!pending.length&&!view.length){const e=document.createElement("div");e.className="empty";e.textContent=q?"No saved prompts match that search.":"Nothing here yet. Write a prompt and press Generate. Your images are saved in this browser.";g.appendChild(e)}
+  $("count").textContent=history.length?`${history.length} saved`:"";
+}
+$("q").oninput=render;
+$("clear").onclick=()=>{if(history.length&&confirm("Delete all saved images?")){history=[];persist();render()}};
+
+// Lightbox
+function open(i){cur=i;const x=view[i];$("lbi").src=x.url;$("lbi").alt=x.prompt;
+  $("lbt").textContent=`${x.full} · seed ${x.seed} · ${x.w}×${x.h} · ${x.provider}${x.note?" · "+x.note:""}`;$("lb").classList.add("on");$("x").focus()}
+function close(){$("lb").classList.remove("on");cur=-1}
+$("x").onclick=close;
+$("prev").onclick=()=>open((cur-1+view.length)%view.length);
+$("next").onclick=()=>open((cur+1)%view.length);
+$("reuse").onclick=()=>{const x=view[cur];$("p").value=x.prompt;$("n").value=x.neg||"";$("s").value=x.seed;close();$("p").focus()};
+$("dl").onclick=()=>{const x=view[cur],a=document.createElement("a");a.href=x.url;a.download=`imageforge-${x.seed}.${x.url.startsWith("data:image/png")?"png":"jpg"}`;a.click()};
+$("del").onclick=()=>{const x=view[cur];history=history.filter(h=>h.id!==x.id);persist();close();render()};
+$("up").onclick=async()=>{const x=view[cur],b=$("up");b.disabled=true;b.textContent="Upscaling…";
+  try{const im=await new Promise((r,j)=>{const i=new Image();i.onload=()=>r(i);i.onerror=()=>j();i.src=x.url});
+    const w=im.naturalWidth*2,h=im.naturalHeight*2,c=document.createElement("canvas");c.width=w;c.height=h;
+    const t=c.getContext("2d");t.imageSmoothingQuality="high";t.drawImage(im,0,0,w,h);
+    history.unshift({...x,id:rid(),url:c.toDataURL("image/jpeg",.92),w,h,note:"Upscaled 2× (canvas, not AI)",at:Date.now()});persist();render();open(0)}
+  catch{alert("Could not upscale this image.")}
+  b.disabled=false;b.textContent="Upscale 2×"};
+document.addEventListener("keydown",e=>{if(cur<0)return;if(e.key==="Escape")close();if(e.key==="ArrowLeft")$("prev").click();if(e.key==="ArrowRight")$("next").click()});
+$("p").addEventListener("keydown",e=>{if((e.metaKey||e.ctrlKey)&&e.key==="Enter")$("go").click()});
+render();
+setInterval(()=>{if(pending.some(j=>!j.error))render()},1000);
+</script>
+</body>
+</html>

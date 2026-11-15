@@ -1,0 +1,6 @@
+{
+  "name": "ImageForge",
+  "description": "Keyless auto-chain text-to-image studio with multi-provider fallback, style presets, batch generation, local history, and single-file HTML export.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
